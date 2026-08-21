@@ -1,0 +1,14 @@
+# Allow images to be served, but block PHP execution inside uploads/ for security
+<FilesMatch "\.(php|phtml|php3|php4|php5|pht)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
