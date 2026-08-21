@@ -1,88 +1,71 @@
-    </main>
+-- Database Schema for Blog Application
+-- IN2120 Web Programming - University of Moratuwa
 
-    <!-- Writing Modal -->
-    <div class="modal-overlay" id="writing-modal-overlay" role="dialog" aria-modal="true">
-        <div class="modal">
-            <div class="modal-header">
-                <span class="modal-title">✍️ Start Writing on TechFlow</span>
-                <button class="modal-close" aria-label="Close">✕</button>
-            </div>
-            <div class="modal-body">
-                <p style="color:var(--text-sub);font-size:0.9rem;margin-bottom:1.5rem;line-height:1.65;">
-                    Ready to share your knowledge? Jump into the full editor and publish your article to the TechFlow community.
-                </p>
-                <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
-                    <?php if (isLoggedIn()): ?>
-                        <a href="create.php" class="btn btn-primary">📝 Open Editor</a>
-                    <?php else: ?>
-                        <a href="register.php" class="btn btn-primary">🚀 Create Free Account</a>
-                        <a href="login.php" class="btn btn-secondary">Login</a>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div>
+-- Create database (run this separately if needed)
+-- CREATE DATABASE IF NOT EXISTS blog_app CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- USE blog_app;
 
-    <!-- Toast Container -->
-    <div id="toast-container"></div>
+-- Drop tables if they exist (for clean setup)
+DROP TABLE IF EXISTS blogPost;
+DROP TABLE IF EXISTS topic;
+DROP TABLE IF EXISTS user;
 
-    <footer class="footer">
-        <div class="footer-inner">
-            <div class="footer-top">
-                <div>
-                    <a href="index.php" class="footer-brand-logo">
-                        <div class="footer-logo-icon">⚡</div>
-                        <span class="footer-logo-name">Tech<span>Flow</span></span>
-                    </a>
-                    <p class="footer-brand-desc">A premium platform for tech writers to share articles, tutorials, and engineering insights.</p>
-                </div>
+-- User table
+CREATE TABLE user (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(20) DEFAULT 'user',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_username (username),
+    INDEX idx_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-                <div>
-                    <div class="footer-col-title">Topics</div>
-                    <div class="footer-links">
-                        <a href="index.php" class="footer-link">🌐 Web Development</a>
-                        <a href="index.php" class="footer-link">🤖 AI & Machine Learning</a>
-                        <a href="index.php" class="footer-link">🔒 Security</a>
-                        <a href="index.php" class="footer-link">☁️ DevOps & Cloud</a>
-                    </div>
-                </div>
+-- Topic table (used for "Browse Topics" / "Explore Topic")
+CREATE TABLE topic (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(100) NOT NULL UNIQUE,
+    icon VARCHAR(10) DEFAULT '🏷️',
+    color VARCHAR(20) DEFAULT '#f97316',
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_slug (slug)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-                <div>
-                    <div class="footer-col-title">Platform</div>
-                    <div class="footer-links">
-                        <a href="index.php" class="footer-link">All Articles</a>
-                        <?php if (isLoggedIn()): ?>
-                            <a href="create.php" class="footer-link">Write Article</a>
-                            <a href="logout.php" class="footer-link">Sign Out</a>
-                        <?php else: ?>
-                            <a href="register.php" class="footer-link">Create Account</a>
-                            <a href="login.php" class="footer-link">Sign In</a>
-                        <?php endif; ?>
-                    </div>
-                </div>
+-- Blog post table
+CREATE TABLE blogPost (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    topic_id INT DEFAULT NULL,
+    image VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
+    FOREIGN KEY (topic_id) REFERENCES topic(id) ON DELETE SET NULL,
+    INDEX idx_user_id (user_id),
+    INDEX idx_created_at (created_at),
+    INDEX idx_topic_id (topic_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-                <div>
-                    <div class="footer-col-title">About</div>
-                    <div class="footer-links">
-                        <a href="about.php" class="footer-link">About TechFlow</a>
-                        <a href="contact.php" class="footer-link">Contact Us</a>
-                        <a href="privacy.php" class="footer-link">Privacy Policy</a>
-                        <a href="terms.php" class="footer-link">Terms of Service</a>
-                    </div>
-                </div>
-            </div>
+-- Seed the default topic list (Browse Topics sidebar)
+INSERT INTO topic (name, slug, icon, color, sort_order) VALUES
+('Web Development',      'web-development',      '🌐', '#f97316', 1),
+('AI & Machine Learning', 'ai-machine-learning',  '🤖', '#fbbf24', 2),
+('DevOps & Cloud',       'devops-cloud',          '☁️', '#10b981', 3),
+('Security',             'security',              '🔒', '#f59e0b', 4),
+('Systems',              'systems',               '⚙️', '#ef4444', 5),
+('Mobile',               'mobile',                '📱', '#fdba74', 6),
+('Data Science',         'data-science',          '📊', '#34d399', 7),
+('Open Source',          'open-source',           '💻', '#f472b6', 8);
 
-            <div class="footer-bottom">
-                <span>© <?php echo date('Y'); ?> TechFlow — Where Ideas Flow</span>
-                <div class="footer-bottom-links">
-                    <a href="privacy.php" class="footer-bottom-link">Privacy</a>
-                    <a href="terms.php" class="footer-bottom-link">Terms</a>
-                    <a href="contact.php" class="footer-bottom-link">Contact</a>
-                </div>
-            </div>
-        </div>
-    </footer>
+-- Optional: Insert a sample admin user (password: admin123)
+-- Password hash for 'admin123' generated with password_hash()
+-- INSERT INTO user (username, email, password, role) VALUES
+-- ('admin', 'admin@example.com', '$2y$10$YourGeneratedHashHere', 'admin');
 
-    <script src="script.js?v=<?php echo time(); ?>"></script>
-</body>
-</html>
+-- Note: To generate password hashes, use PHP:
+-- echo password_hash('yourpassword', PASSWORD_DEFAULT);
