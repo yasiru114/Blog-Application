@@ -165,4 +165,87 @@ function generateExcerpt($content, $length = 150) {
     }
     return substr($text, 0, $length) . '...';
 }
+
+/**
+ * Handle a featured-image upload for a blog post.
+ * Validates type/size, saves the file into /uploads with a unique name.
+ *
+ * @param string $inputName - name of the <input type="file"> field
+ * @return array ['success' => bool, 'filename' => string|null, 'error' => string|null]
+ */
+function handleImageUpload($inputName = 'image') {
+    // No file selected is not an error - it's just optional
+    if (!isset($_FILES[$inputName]) || $_FILES[$inputName]['error'] === UPLOAD_ERR_NO_FILE) {
+        return ['success' => true, 'filename' => null, 'error' => null];
+    }
+
+    $file = $_FILES[$inputName];
+
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        return ['success' => false, 'filename' => null, 'error' => 'Image upload failed. Please try again.'];
+    }
+
+    // 5MB max
+    $maxSize = 5 * 1024 * 1024;
+    if ($file['size'] > $maxSize) {
+        return ['success' => false, 'filename' => null, 'error' => 'Image must be smaller than 5MB.'];
+    }
+
+    $allowedTypes = [
+        'image/jpeg' => 'jpg',
+        'image/png'  => 'png',
+        'image/gif'  => 'gif',
+        'image/webp' => 'webp',
+    ];
+
+    // Verify the real MIME type (don't trust the client-supplied one)
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mimeType = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+
+    if (!isset($allowedTypes[$mimeType])) {
+        return ['success' => false, 'filename' => null, 'error' => 'Only JPG, PNG, GIF, and WEBP images are allowed.'];
+    }
+
+    $ext = $allowedTypes[$mimeType];
+    $filename = bin2hex(random_bytes(16)) . '.' . $ext;
+    $uploadDir = __DIR__ . '/uploads/';
+
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+
+    $destination = $uploadDir . $filename;
+
+    if (!move_uploaded_file($file['tmp_name'], $destination)) {
+        return ['success' => false, 'filename' => null, 'error' => 'Could not save the uploaded image.'];
+    }
+
+    return ['success' => true, 'filename' => $filename, 'error' => null];
+}
+
+/**
+ * Delete a previously uploaded post image from disk, if present.
+ * @param string|null $filename
+ */
+function deletePostImage($filename) {
+    if (!empty($filename)) {
+        $path = __DIR__ . '/uploads/' . basename($filename);
+        if (is_file($path)) {
+            @unlink($path);
+        }
+    }
+}
+
+/**
+ * Get the public URL for a post's featured image, or null.
+ * @param string|null $filename
+ * @return string|null
+ */
+function getPostImageUrl($filename) {
+    if (empty($filename)) {
+        return null;
+    }
+    return 'uploads/' . rawurlencode($filename);
+}
 ?>
