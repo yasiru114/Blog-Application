@@ -152,5 +152,4 @@ Then open: http://localhost:8000
   ```
 - Test with multiple users to verify authorization logic
 
-Good luck with your submission!
 }
