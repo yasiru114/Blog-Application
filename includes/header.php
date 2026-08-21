@@ -69,6 +69,15 @@ require_once __DIR__ . '/../auth.php';
             </div>
 
             <div class="nav-menu" id="nav-menu">
+                <!-- Mobile-only primary links (hidden on desktop) -->
+                <div class="nav-menu-primary-links">
+                    <a href="index.php" class="nav-link">🏠 Home</a>
+                    <a href="index.php#articles" class="nav-link">🏷️ Topics</a>
+                    <a href="about.php" class="nav-link">ℹ️ About</a>
+                    <a href="contact.php" class="nav-link">📬 Contact</a>
+                </div>
+                <div class="nav-menu-divider"></div>
+
                 <button class="nav-icon-btn" id="nav-search-icon-btn" title="Search" type="button">🔍</button>
                 <button class="theme-toggle nav-icon-btn" id="theme-toggle" title="Toggle theme">🌙</button>
 
