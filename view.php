@@ -15,9 +15,11 @@ if ($postId <= 0) {
 $conn = getDBConnection();
 $stmt = $conn->prepare("
     SELECT bp.id, bp.title, bp.content, bp.image, bp.created_at, bp.updated_at,
-           u.id as user_id, u.username
+           u.id as user_id, u.username,
+           t.id as topic_id, t.name as topic_name, t.slug as topic_slug, t.icon as topic_icon, t.color as topic_color
     FROM blogPost bp
     JOIN user u ON bp.user_id = u.id
+    LEFT JOIN topic t ON bp.topic_id = t.id
     WHERE bp.id = ?
 ");
 $stmt->bind_param('i', $postId);
@@ -48,6 +50,8 @@ if (!$post) {
 $pageTitle = $post['title'];
 $isOwner = isLoggedIn() && isPostOwner($post['user_id']);
 $renderedContent = markdownToHtml($post['content']);
+$hasTopic = !empty($post['topic_id']);
+$topicsWithCounts = getAllTopicsWithCounts();
 
 $plainText = strip_tags($renderedContent);
 $wordCount = str_word_count($plainText);
@@ -74,7 +78,11 @@ require_once 'includes/header.php';
             <div class="blog-single-inner">
 
                 <div class="blog-single-tags">
-                    <span class="tag">📄 Article</span>
+                    <?php if ($hasTopic): ?>
+                        <a href="index.php?topic=<?php echo urlencode($post['topic_slug']); ?>" class="tag" style="--tag-color:<?php echo $post['topic_color']; ?>"><?php echo $post['topic_icon']; ?> <?php echo escape($post['topic_name']); ?></a>
+                    <?php else: ?>
+                        <span class="tag">📄 Article</span>
+                    <?php endif; ?>
                     <span class="tag" style="background:rgba(251,191,36,0.15);border-color:rgba(251,191,36,0.2);color:#fbbf24;">⏱ <?php echo $readTime; ?> min read</span>
                 </div>
 
@@ -130,7 +138,7 @@ require_once 'includes/header.php';
 
                     <div style="display:flex;gap:0.5rem;margin-left:auto;">
                         <button class="action-btn like-btn" id="article-like-btn" title="Like this article">
-                            ❤️ Like <span class="action-btn-count"><?php echo rand(5, 80); ?></span>
+                            ❤️ Like
                         </button>
                         <button class="action-btn bookmark-btn" id="article-bookmark-btn" title="Bookmark">
                             🔖 Save
@@ -211,22 +219,18 @@ require_once 'includes/header.php';
                     <h3>Explore Topics</h3>
                 </div>
                 <div class="topic-list">
-                    <?php
-                    $topics = [
-                        ['name' => 'Web Development', 'color' => '#f97316'],
-                        ['name' => 'AI & ML', 'color' => '#fbbf24'],
-                        ['name' => 'DevOps', 'color' => '#10b981'],
-                        ['name' => 'Security', 'color' => '#f59e0b'],
-                        ['name' => 'Systems', 'color' => '#ef4444'],
-                        ['name' => 'Mobile', 'color' => '#fdba74'],
-                    ];
-                    foreach ($topics as $t): ?>
-                        <div class="topic-item">
+                    <?php foreach ($topicsWithCounts as $t):
+                        $isCurrentTopic = $hasTopic && $post['topic_slug'] === $t['slug'];
+                    ?>
+                        <a href="index.php?topic=<?php echo urlencode($t['slug']); ?>"
+                           class="topic-item<?php echo $isCurrentTopic ? ' active' : ''; ?>"
+                           title="Explore <?php echo escape($t['name']); ?> articles">
                             <span class="topic-item-name">
                                 <span class="topic-item-dot" style="background:<?php echo $t['color']; ?>"></span>
-                                <?php echo $t['name']; ?>
+                                <?php echo $t['icon']; ?> <?php echo escape($t['name']); ?>
                             </span>
-                        </div>
+                            <span class="topic-item-count"><?php echo (int)$t['post_count']; ?></span>
+                        </a>
                     <?php endforeach; ?>
                 </div>
             </div>
