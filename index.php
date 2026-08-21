@@ -9,22 +9,42 @@ require_once 'auth.php';
 $pageTitle = 'Home';
 
 $conn = getDBConnection();
-$stmt = $conn->prepare("
+
+// Optional topic filter, e.g. index.php?topic=web-development (set by
+// clicking "Browse Topics" / "Explore Topic")
+$activeTopicSlug = isset($_GET['topic']) ? trim($_GET['topic']) : '';
+$activeTopic = $activeTopicSlug !== '' ? getTopicBySlug($activeTopicSlug) : null;
+
+$postsSql = "
     SELECT bp.id, bp.title, bp.content, bp.image, bp.created_at, bp.updated_at,
-           u.id as user_id, u.username
+           u.id as user_id, u.username,
+           t.id as topic_id, t.name as topic_name, t.slug as topic_slug, t.icon as topic_icon, t.color as topic_color
     FROM blogPost bp
     JOIN user u ON bp.user_id = u.id
-    ORDER BY bp.created_at DESC
-");
+    LEFT JOIN topic t ON bp.topic_id = t.id
+";
+if ($activeTopic) {
+    $postsSql .= " WHERE bp.topic_id = ? ORDER BY bp.created_at DESC";
+    $stmt = $conn->prepare($postsSql);
+    $stmt->bind_param('i', $activeTopic['id']);
+} else {
+    $postsSql .= " ORDER BY bp.created_at DESC";
+    $stmt = $conn->prepare($postsSql);
+}
 $stmt->execute();
 $result = $stmt->get_result();
 $posts = $result->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-// Get stats
-$totalPosts = count($posts);
+// Get stats (site-wide, not affected by the topic filter above)
+$totalPostsResult = $conn->query("SELECT COUNT(*) as cnt FROM blogPost");
+$totalPosts = $totalPostsResult ? (int)$totalPostsResult->fetch_assoc()['cnt'] : 0;
 $authorsResult = $conn->query("SELECT COUNT(DISTINCT user_id) as cnt FROM blogPost");
 $totalAuthors = $authorsResult ? $authorsResult->fetch_assoc()['cnt'] : 0;
+
+// Topics for the "Browse Topics" sidebar - each with a live post count
+$topicsWithCounts = getAllTopicsWithCounts();
+$totalTopics = count($topicsWithCounts);
 
 require_once 'includes/header.php';
 ?>
@@ -71,7 +91,7 @@ require_once 'includes/header.php';
                 </div>
                 <div class="hero-stat-divider"></div>
                 <div class="hero-stat">
-                    <span class="hero-stat-value" data-count="9">9</span>
+                    <span class="hero-stat-value" data-count="<?php echo $totalTopics; ?>"><?php echo $totalTopics; ?></span>
                     <span class="hero-stat-label">Topics</span>
                 </div>
                 <div class="hero-stat-divider"></div>
@@ -83,7 +103,41 @@ require_once 'includes/header.php';
         </div>
 
         <div class="hero-visual">
-            <canvas id="network-canvas"></canvas>
+            <div class="iso-scene">
+                <div class="iso-grid-lines"></div>
+
+                <svg class="iso-connectors" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    <line x1="50" y1="50" x2="10" y2="14" class="iso-line iso-line-cloud" />
+                    <line x1="50" y1="50" x2="80" y2="14" class="iso-line iso-line-shield" />
+                    <line x1="50" y1="50" x2="10" y2="78" class="iso-line iso-line-db" />
+                    <line x1="50" y1="50" x2="80" y2="78" class="iso-line iso-line-cpu" />
+                    <circle r="1.3" class="iso-dot iso-dot-cloud">
+                        <animateMotion dur="3s" repeatCount="indefinite" path="M50,50 L10,14" />
+                    </circle>
+                    <circle r="1.3" class="iso-dot iso-dot-shield">
+                        <animateMotion dur="3.4s" repeatCount="indefinite" path="M50,50 L80,14" />
+                    </circle>
+                    <circle r="1.3" class="iso-dot iso-dot-db">
+                        <animateMotion dur="3.8s" repeatCount="indefinite" path="M50,50 L10,78" />
+                    </circle>
+                    <circle r="1.3" class="iso-dot iso-dot-cpu">
+                        <animateMotion dur="4.2s" repeatCount="indefinite" path="M50,50 L80,78" />
+                    </circle>
+                </svg>
+
+                <div class="iso-cube">
+                    <div class="iso-cube-layer iso-layer-3"></div>
+                    <div class="iso-cube-layer iso-layer-2"></div>
+                    <div class="iso-cube-layer iso-layer-1"></div>
+                    <div class="iso-cube-beam"></div>
+                    <div class="iso-cube-core">&lt;/&gt;</div>
+                </div>
+
+                <div class="iso-node iso-node-cloud" style="--nx:10%; --ny:14%;" title="Cloud Computing"><span>☁️</span></div>
+                <div class="iso-node iso-node-shield" style="--nx:80%; --ny:14%;" title="Security"><span>🛡️</span></div>
+                <div class="iso-node iso-node-db" style="--nx:10%; --ny:78%;" title="Data"><span>🗄️</span></div>
+                <div class="iso-node iso-node-cpu" style="--nx:80%; --ny:78%;" title="Systems"><span>🧩</span></div>
+            </div>
         </div>
     </div>
 </section>
@@ -91,7 +145,7 @@ require_once 'includes/header.php';
 <!-- ARTICLES SECTION -->
 <div class="main-content" id="articles">
 
-    <?php if (empty($posts)): ?>
+    <?php if (empty($posts) && !$activeTopic): ?>
         <div class="empty-state reveal">
             <div class="empty-state-icon">📝</div>
             <h2>No articles yet</h2>
@@ -111,9 +165,9 @@ require_once 'includes/header.php';
         <div class="page-header reveal">
             <div class="page-header-inner">
                 <div>
-                    <div class="page-eyebrow">Latest Articles</div>
-                    <h1>Fresh from the community</h1>
-                    <p class="page-subtitle"><?php echo $totalPosts; ?> article<?php echo $totalPosts !== 1 ? 's' : ''; ?> published by our writers</p>
+                    <div class="page-eyebrow"><?php echo $activeTopic ? 'Topic' : 'Latest Articles'; ?></div>
+                    <h1><?php echo $activeTopic ? ($activeTopic['icon'] . ' ' . escape($activeTopic['name'])) : 'Fresh from the community'; ?></h1>
+                    <p class="page-subtitle"><?php echo count($posts); ?> article<?php echo count($posts) !== 1 ? 's' : ''; ?><?php echo $activeTopic ? ' in this topic' : ' published by our writers'; ?></p>
                 </div>
                 <?php if (isLoggedIn()): ?>
                     <a href="create.php" class="btn btn-primary" id="write-article-btn">
@@ -127,17 +181,38 @@ require_once 'includes/header.php';
             </div>
         </div>
 
+        <?php if ($activeTopic): ?>
+            <div class="topic-filter-banner reveal">
+                <span>🔎 Exploring articles tagged <strong><?php echo $activeTopic['icon']; ?> <?php echo escape($activeTopic['name']); ?></strong></span>
+                <a href="index.php" class="topic-filter-clear">✕ Clear filter</a>
+            </div>
+        <?php endif; ?>
+
+        <?php if (empty($posts) && $activeTopic): ?>
+            <div class="empty-state reveal">
+                <div class="empty-state-icon">🏷️</div>
+                <h2>No articles in this topic yet</h2>
+                <p>Be the first to publish an article under <?php echo escape($activeTopic['name']); ?>!</p>
+                <div class="empty-state-actions">
+                    <?php if (isLoggedIn()): ?>
+                        <a href="create.php" class="btn btn-primary" id="empty-write-btn">Write an Article</a>
+                    <?php else: ?>
+                        <a href="register.php" class="btn btn-primary" id="empty-register-btn">Join TechFlow</a>
+                    <?php endif; ?>
+                    <a href="index.php" class="btn btn-secondary">← All Articles</a>
+                </div>
+            </div>
+        <?php else: ?>
+
         <div class="blog-layout">
             <!-- Articles -->
             <div class="blog-grid" id="articles-grid">
                 <?php
-                $topicColors = ['#f97316', '#fbbf24', '#f59e0b', '#10b981', '#ef4444', '#fdba74', '#34d399', '#f472b6'];
-                $topicsList = ['Web Dev', 'DevOps', 'AI/ML', 'Security', 'Systems', 'Mobile', 'Data', 'Open Source'];
-                $idx = 0;
                 foreach ($posts as $post):
-                    $color = $topicColors[$idx % count($topicColors)];
-                    $topic = $topicsList[$idx % count($topicsList)];
-                    $idx++;
+                    $hasTopic = !empty($post['topic_id']);
+                    $color = $hasTopic ? $post['topic_color'] : '#8b8b9e';
+                    $topic = $hasTopic ? $post['topic_name'] : 'Uncategorized';
+                    $topicIcon = $hasTopic ? $post['topic_icon'] : '🏷️';
 
                     $plainText = strip_tags(markdownToHtml($post['content']));
                     $excerpt = generateExcerpt($plainText, 180);
@@ -156,7 +231,11 @@ require_once 'includes/header.php';
 
                         <div class="blog-card-top">
                             <div class="blog-card-tags">
-                                <span class="tag" style="--tag-color:<?php echo $color; ?>"><?php echo $topic; ?></span>
+                                <?php if ($hasTopic): ?>
+                                    <a href="index.php?topic=<?php echo urlencode($post['topic_slug']); ?>" class="tag" style="--tag-color:<?php echo $color; ?>"><?php echo $topicIcon; ?> <?php echo escape($topic); ?></a>
+                                <?php else: ?>
+                                    <span class="tag" style="--tag-color:<?php echo $color; ?>"><?php echo $topicIcon; ?> <?php echo escape($topic); ?></span>
+                                <?php endif; ?>
                             </div>
                             <span class="blog-card-read-time">⏱ <?php echo $readTime; ?> min read</span>
                         </div>
@@ -180,7 +259,7 @@ require_once 'includes/header.php';
 
                             <div class="blog-card-actions-row">
                                 <button class="action-btn like-btn" id="like-<?php echo $post['id']; ?>" title="Like this article">
-                                    ❤️ <span class="action-btn-count"><?php echo rand(0, 48); ?></span>
+                                    ❤️
                                 </button>
                                 <button class="action-btn bookmark-btn" id="bookmark-<?php echo $post['id']; ?>" title="Bookmark">
                                     🔖
@@ -228,25 +307,19 @@ require_once 'includes/header.php';
                         <h3>Browse Topics</h3>
                     </div>
                     <div class="topic-list" id="topic-list">
-                        <?php
-                        $topics = [
-                            ['name' => 'Web Development', 'color' => '#f97316', 'icon' => '🌐'],
-                            ['name' => 'AI & Machine Learning', 'color' => '#fbbf24', 'icon' => '🤖'],
-                            ['name' => 'DevOps & Cloud', 'color' => '#10b981', 'icon' => '☁️'],
-                            ['name' => 'Security', 'color' => '#f59e0b', 'icon' => '🔒'],
-                            ['name' => 'Systems', 'color' => '#ef4444', 'icon' => '⚙️'],
-                            ['name' => 'Mobile', 'color' => '#fdba74', 'icon' => '📱'],
-                            ['name' => 'Data Science', 'color' => '#34d399', 'icon' => '📊'],
-                            ['name' => 'Open Source', 'color' => '#f472b6', 'icon' => '💻'],
-                        ];
-                        foreach ($topics as $t): ?>
-                            <div class="topic-item" id="topic-<?php echo strtolower(str_replace([' ', '&'], ['_', ''], $t['name'])); ?>">
+                        <?php foreach ($topicsWithCounts as $t):
+                            $isActiveTopic = $activeTopic && $activeTopic['slug'] === $t['slug'];
+                        ?>
+                            <a href="index.php?topic=<?php echo urlencode($t['slug']); ?>"
+                               class="topic-item<?php echo $isActiveTopic ? ' active' : ''; ?>"
+                               id="topic-<?php echo escape($t['slug']); ?>"
+                               title="Explore <?php echo escape($t['name']); ?> articles">
                                 <span class="topic-item-name">
                                     <span class="topic-item-dot" style="background:<?php echo $t['color']; ?>"></span>
-                                    <?php echo $t['icon']; ?> <?php echo $t['name']; ?>
+                                    <?php echo $t['icon']; ?> <?php echo escape($t['name']); ?>
                                 </span>
-                                <span class="topic-item-count"><?php echo rand(0, 12); ?></span>
-                            </div>
+                                <span class="topic-item-count"><?php echo (int)$t['post_count']; ?></span>
+                            </a>
                         <?php endforeach; ?>
                     </div>
                 </div>
@@ -268,12 +341,13 @@ require_once 'includes/header.php';
                         </div>
                         <div class="topic-item">
                             <span class="topic-item-name">🏷️ Topics</span>
-                            <span class="topic-item-count">9</span>
+                            <span class="topic-item-count"><?php echo $totalTopics; ?></span>
                         </div>
                     </div>
                 </div>
             </aside>
         </div>
+        <?php endif; ?>
 
     <?php endif; ?>
 </div>
