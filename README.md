@@ -178,17 +178,7 @@ Use the "Preview" tab to see rendered output before publishing.
 | `style.css` | All styling and responsive rules |
 | `script.js` | Markdown preview, form validation |
 
-## Screenshots
 
-*(Add screenshots of your running application here)*
-
-## License
-
-This project is for educational purposes (IN2120 - Web Programming, University of Moratuwa).
-
-## Author
-
-[Your Name] - [Your Student Index Number]
 
 ## Submission Checklist
 
@@ -201,15 +191,7 @@ This project is for educational purposes (IN2120 - Web Programming, University o
 - [ ] Folder renamed with student index number
 - [ ] All files zipped and ready for submission
 
-## Notes
-
-- Make sure to never commit real database credentials to GitHub
-- Use environment variables or a separate config file not in version control for production
-- Test all features before recording the demo video
-- Ensure the hosted version has the same functionality as local
 
 ---
 
-**Course**: IN2120 - Web Programming  
-**Year**: 2026  
-**University**: University of Moratuwa
+

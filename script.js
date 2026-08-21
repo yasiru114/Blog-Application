@@ -6,7 +6,6 @@ document.addEventListener('DOMContentLoaded', function () {
     initThemeToggle();
     initMobileNav();
     initHeroCanvas();
-    initNetworkCanvas();
     initScrollReveal();
     initSearch();
     initEditorTabs();
@@ -177,119 +176,6 @@ function initHeroCanvas() {
 
     const ro = new ResizeObserver(() => { resize(); createParticles(); });
     ro.observe(canvas.parentElement);
-}
-
-
-/* ===========================
-   NETWORK CANVAS (hero right side)
-=========================== */
-function initNetworkCanvas() {
-    const canvas = document.getElementById('network-canvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-
-    const topics = [
-        { label: 'Web Dev', color: '#7c3aed', x: 0.55, y: 0.2, size: 10 },
-        { label: 'AI/ML', color: '#06b6d4', x: 0.82, y: 0.3, size: 9 },
-        { label: 'Security', color: '#f59e0b', x: 0.72, y: 0.65, size: 8 },
-        { label: 'DevOps', color: '#10b981', x: 0.35, y: 0.55, size: 8 },
-        { label: 'Systems', color: '#ef4444', x: 0.88, y: 0.55, size: 7 },
-        { label: 'Mobile', color: '#8b5cf6', x: 0.2, y: 0.35, size: 7 },
-        { label: 'Data', color: '#06b6d4', x: 0.62, y: 0.82, size: 9 },
-        { label: 'Cloud', color: '#34d399', x: 0.45, y: 0.78, size: 7 },
-        { label: 'Open Source', color: '#f472b6', x: 0.15, y: 0.7, size: 6 },
-    ];
-
-    const connections = [
-        [0, 1], [0, 3], [0, 5], [1, 2], [1, 4], [2, 6],
-        [3, 7], [3, 8], [4, 2], [6, 7], [5, 8],
-    ];
-
-    let time = 0;
-    let nodes;
-
-    function buildNodes(w, h) {
-        nodes = topics.map(t => ({
-            ...t,
-            cx: t.x * w,
-            cy: t.y * h,
-            pulse: Math.random() * Math.PI * 2,
-        }));
-    }
-
-    function resize() {
-        canvas.width = canvas.offsetWidth;
-        canvas.height = canvas.offsetHeight;
-        buildNodes(canvas.width, canvas.height);
-    }
-
-    function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        time += 0.012;
-        const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-
-        // Connections
-        connections.forEach(([i, j]) => {
-            const a = nodes[i], b = nodes[j];
-            const grad = ctx.createLinearGradient(a.cx, a.cy, b.cx, b.cy);
-            grad.addColorStop(0, a.color + '55');
-            grad.addColorStop(1, b.color + '55');
-            ctx.beginPath();
-            ctx.moveTo(a.cx, a.cy);
-            ctx.lineTo(b.cx, b.cy);
-            ctx.strokeStyle = grad;
-            ctx.lineWidth = isDark ? 1.2 : 0.8;
-            ctx.stroke();
-
-            // Traveling dot
-            const t2 = (Math.sin(time + i * 0.7 + j * 0.3) + 1) / 2;
-            const tx = a.cx + (b.cx - a.cx) * t2;
-            const ty = a.cy + (b.cy - a.cy) * t2;
-            ctx.beginPath();
-            ctx.arc(tx, ty, 2, 0, Math.PI * 2);
-            ctx.fillStyle = isDark ? '#8b5cf6cc' : '#7c3aed99';
-            ctx.fill();
-        });
-
-        // Nodes
-        nodes.forEach(n => {
-            const pulse = Math.sin(time * 1.5 + n.pulse) * 2;
-            const r = n.size + pulse;
-
-            // Glow
-            const grd = ctx.createRadialGradient(n.cx, n.cy, 0, n.cx, n.cy, r * 3);
-            grd.addColorStop(0, n.color + '44');
-            grd.addColorStop(1, 'transparent');
-            ctx.beginPath();
-            ctx.arc(n.cx, n.cy, r * 3, 0, Math.PI * 2);
-            ctx.fillStyle = grd;
-            ctx.fill();
-
-            // Circle
-            ctx.beginPath();
-            ctx.arc(n.cx, n.cy, r, 0, Math.PI * 2);
-            ctx.fillStyle = n.color;
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.arc(n.cx, n.cy, r * 0.45, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            ctx.fill();
-
-            // Label
-            ctx.font = `500 11px Inter, sans-serif`;
-            ctx.fillStyle = isDark ? 'rgba(240,240,255,0.65)' : 'rgba(26,26,46,0.65)';
-            ctx.textAlign = 'center';
-            ctx.fillText(n.label, n.cx, n.cy + r + 14);
-        });
-
-        requestAnimationFrame(draw);
-    }
-
-    resize();
-    draw();
-    const ro = new ResizeObserver(resize);
-    ro.observe(canvas);
 }
 
 
@@ -585,59 +471,134 @@ function initFormEnhancements() {
         update();
     }
 
-    // Featured image preview
+    // Featured image dropzone: drag & drop, progress animation, preview, remove/change
     const imageInput = document.getElementById('image');
     const imagePreview = document.getElementById('image-preview');
-    if (imageInput && imagePreview) {
-        imageInput.addEventListener('change', function () {
-            const file = this.files && this.files[0];
-            if (!file) {
-                imagePreview.style.display = 'none';
-                imagePreview.src = '';
-                return;
-            }
+    const dropzone = document.getElementById('image-dropzone');
+    const dzProgressBar = document.getElementById('dropzone-progress-bar');
+    const dzFileMeta = document.getElementById('dropzone-file-meta');
+    const dzChangeBtn = document.getElementById('dropzone-change-btn');
+    const dzRemoveBtn = document.getElementById('dropzone-remove-btn');
 
-            if (!file.type.startsWith('image/')) {
-                window.TechFlow?.showToast('⚠️ Please choose an image file', 'error');
-                this.value = '';
-                imagePreview.style.display = 'none';
-                imagePreview.src = '';
-                return;
-            }
-
-            if (file.size > 5 * 1024 * 1024) {
-                window.TechFlow?.showToast('⚠️ Image must be smaller than 5MB', 'error');
-                this.value = '';
-                imagePreview.style.display = 'none';
-                imagePreview.src = '';
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = e => {
-                imagePreview.src = e.target.result;
-                imagePreview.style.display = 'block';
-                // A new image was chosen, so it will replace the current one
-                const removeCheckbox = document.getElementById('remove-image-checkbox');
-                if (removeCheckbox) removeCheckbox.checked = false;
-            };
-            reader.readAsDataURL(file);
-        });
+    function formatFileSize(bytes) {
+        if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        return Math.round(bytes / 1024) + ' KB';
     }
 
-    // If "remove current image" is checked, clear any newly-chosen file
-    const removeImageCheckbox = document.getElementById('remove-image-checkbox');
-    if (removeImageCheckbox && imageInput) {
-        removeImageCheckbox.addEventListener('change', function () {
-            if (this.checked) {
-                imageInput.value = '';
-                if (imagePreview) {
-                    imagePreview.style.display = 'none';
-                    imagePreview.src = '';
+    function clearDropzone() {
+        if (imageInput) imageInput.value = '';
+        if (imagePreview) imagePreview.src = '';
+        if (dzFileMeta) dzFileMeta.innerHTML = '';
+        if (dzProgressBar) dzProgressBar.style.width = '0%';
+        dropzone?.classList.remove('has-file', 'dropzone-loading');
+        lastLoadedFileKey = null;
+        const removeFlag = document.getElementById('remove-image-checkbox');
+        if (removeFlag) removeFlag.value = '1'; // tell the server to drop the current image too
+    }
+
+    let lastLoadedFileKey = null;
+    function loadFileIntoDropzone(file) {
+        if (!file) return;
+
+        // Guard against double-processing: the browser already populates a file
+        // input natively when a file is dropped directly onto it, which fires
+        // 'change' in addition to our own 'drop' handler.
+        const fileKey = file.name + '|' + file.size + '|' + file.lastModified;
+        if (fileKey === lastLoadedFileKey) return;
+        lastLoadedFileKey = fileKey;
+
+        if (!file.type.startsWith('image/')) {
+            window.TechFlow?.showToast('⚠️ Please choose an image file', 'error');
+            if (imageInput) imageInput.value = '';
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            window.TechFlow?.showToast('⚠️ Image must be smaller than 5MB', 'error');
+            if (imageInput) imageInput.value = '';
+            return;
+        }
+
+        dropzone?.classList.add('dropzone-loading');
+        if (dzProgressBar) dzProgressBar.style.width = '0%';
+
+        const reader = new FileReader();
+        reader.onprogress = e => {
+            if (e.lengthComputable && dzProgressBar) {
+                dzProgressBar.style.width = Math.round((e.loaded / e.total) * 100) + '%';
+            }
+        };
+        reader.onload = e => {
+            if (dzProgressBar) dzProgressBar.style.width = '100%';
+            // Small delay so the progress bar's completion is visible before the preview pops in
+            setTimeout(() => {
+                if (imagePreview) imagePreview.src = e.target.result;
+                if (dzFileMeta) {
+                    dzFileMeta.innerHTML = `<span class="dz-dot"></span> ${file.name} · ${formatFileSize(file.size)}`;
                 }
+                dropzone?.classList.remove('dropzone-loading');
+                dropzone?.classList.add('has-file');
+                const removeFlag = document.getElementById('remove-image-checkbox');
+                if (removeFlag) removeFlag.value = '0';
+            }, 280);
+        };
+        reader.readAsDataURL(file);
+    }
+
+    if (imageInput && dropzone) {
+        imageInput.addEventListener('change', function () {
+            loadFileIntoDropzone(this.files && this.files[0]);
+        });
+
+        // Drag & drop interactivity
+        ['dragenter', 'dragover'].forEach(evt => {
+            dropzone.addEventListener(evt, e => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.add('dropzone-active');
+            });
+        });
+        ['dragleave', 'drop'].forEach(evt => {
+            dropzone.addEventListener(evt, e => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (evt === 'dragleave' && e.target !== dropzone) return;
+                dropzone.classList.remove('dropzone-active');
+            });
+        });
+        dropzone.addEventListener('drop', e => {
+            const file = e.dataTransfer?.files && e.dataTransfer.files[0];
+            if (file) {
+                // Sync to the real input so the form submits the dropped file
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                imageInput.files = dt.files;
+                loadFileIntoDropzone(file);
             }
         });
+
+        // Keyboard accessibility: Enter/Space opens the file picker
+        dropzone.addEventListener('keydown', e => {
+            if ((e.key === 'Enter' || e.key === ' ') && e.target === dropzone) {
+                e.preventDefault();
+                imageInput.click();
+            }
+        });
+
+        // "Change" button re-opens the file picker without leaving the preview state
+        dzChangeBtn?.addEventListener('click', e => {
+            e.stopPropagation();
+            imageInput.click();
+        });
+
+        // "Remove" button clears the selection and flags removal for existing images
+        dzRemoveBtn?.addEventListener('click', e => {
+            e.stopPropagation();
+            e.preventDefault();
+            clearDropzone();
+            window.TechFlow?.showToast('Image removed', 'success');
+        });
     }
+
 }
 
 function getPasswordStrength(pw) {
