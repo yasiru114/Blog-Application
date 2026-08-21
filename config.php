@@ -11,7 +11,7 @@ define('DB_PASS', '');
 define('DB_NAME', 'blog_app');
 
 // Application settings
-define('APP_NAME', 'BlogApp');
+define('APP_NAME', 'TechFlow');
 define('APP_URL', 'http://localhost:8000'); // Change this when hosting
 
 // Start session if not already started
