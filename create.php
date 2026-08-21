@@ -12,10 +12,13 @@ $pageTitle = 'Write Article';
 $errors = [];
 $title = '';
 $content = '';
+$topicId = '';
+$topics = getAllTopics();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title'] ?? '');
     $content = trim($_POST['content'] ?? '');
+    $topicId = trim($_POST['topic_id'] ?? '');
 
     if (empty($title)) {
         $errors[] = 'Title is required';
@@ -25,6 +28,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (empty($content)) {
         $errors[] = 'Blog content is required';
+    }
+
+    // Validate the chosen topic actually exists
+    // (cast every id to int - mysqli can return numeric columns as
+    // strings depending on driver config, which broke strict in_array)
+    $validTopicIds = array_map('intval', array_column($topics, 'id'));
+    if ($topicId === '' || !in_array((int)$topicId, $validTopicIds, true)) {
+        $errors[] = 'Please select a topic for your article';
     }
 
     $uploadedImage = null;
@@ -40,8 +51,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($errors)) {
         $conn = getDBConnection();
         $userId = getCurrentUserId();
-        $stmt = $conn->prepare("INSERT INTO blogPost (user_id, title, content, image) VALUES (?, ?, ?, ?)");
-        $stmt->bind_param('isss', $userId, $title, $content, $uploadedImage);
+        $topicIdInt = (int)$topicId;
+        $stmt = $conn->prepare("INSERT INTO blogPost (user_id, title, content, topic_id, image) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param('issis', $userId, $title, $content, $topicIdInt, $uploadedImage);
 
         if ($stmt->execute()) {
             $newPostId = $stmt->insert_id;
@@ -93,14 +105,51 @@ require_once 'includes/header.php';
             </div>
 
             <div class="form-group">
-                <label for="image">🖼️ Featured Image <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
-                <input
-                    type="file"
-                    id="image"
-                    name="image"
-                    accept="image/png,image/jpeg,image/gif,image/webp"
-                >
-                <img id="image-preview" src="" alt="" style="display:none;max-width:280px;margin-top:0.75rem;border-radius:var(--r,12px);border:1px solid var(--border);">
+                <label for="topic_id">🏷️ Topic</label>
+                <select id="topic_id" name="topic_id" required>
+                    <option value="" disabled <?php echo empty($topicId) ? 'selected' : ''; ?>>Select a topic for your article...</option>
+                    <?php foreach ($topics as $t): ?>
+                        <option value="<?php echo (int)$t['id']; ?>" <?php echo ((string)$topicId === (string)$t['id']) ? 'selected' : ''; ?>>
+                            <?php echo $t['icon']; ?> <?php echo escape($t['name']); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <span class="form-hint">Choose the topic that best matches your article — it'll show up under Browse Topics.</span>
+            </div>
+
+            <div class="form-group">
+                <label for="image">🖼️ Featured Image <span class="label-optional">(optional)</span></label>
+
+                <div class="dropzone" id="image-dropzone" tabindex="0" role="button" aria-label="Upload a featured image">
+                    <input
+                        type="file"
+                        id="image"
+                        name="image"
+                        class="dropzone-input"
+                        accept="image/png,image/jpeg,image/gif,image/webp"
+                    >
+
+                    <div class="dropzone-content" id="dropzone-content">
+                        <div class="dropzone-orbit">
+                            <span class="dropzone-orbit-ring"></span>
+                            <span class="dropzone-orbit-ring dropzone-orbit-ring-2"></span>
+                            <div class="dropzone-icon">⬆️</div>
+                        </div>
+                        <p class="dropzone-title">Drag &amp; drop your image here</p>
+                        <p class="dropzone-sub">or <span class="dropzone-browse">browse files</span> — PNG, JPG, GIF or WEBP, up to 5MB</p>
+                    </div>
+
+                    <div class="dropzone-progress"><div class="dropzone-progress-bar" id="dropzone-progress-bar"></div></div>
+
+                    <div class="dropzone-preview" id="dropzone-preview">
+                        <img id="image-preview" src="" alt="Selected image preview">
+                        <div class="dropzone-preview-overlay">
+                            <button type="button" class="dropzone-change-btn" id="dropzone-change-btn">🔄 Change</button>
+                            <button type="button" class="dropzone-remove-btn" id="dropzone-remove-btn">🗑️ Remove</button>
+                        </div>
+                    </div>
+                    <div class="dropzone-file-meta" id="dropzone-file-meta"></div>
+                </div>
             </div>
 
             <div class="form-group">
