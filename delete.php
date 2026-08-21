@@ -17,7 +17,7 @@ if ($postId <= 0) {
 
 // Verify ownership before delete
 $conn = getDBConnection();
-$stmt = $conn->prepare("SELECT user_id FROM blogPost WHERE id = ?");
+$stmt = $conn->prepare("SELECT user_id, image FROM blogPost WHERE id = ?");
 $stmt->bind_param('i', $postId);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -38,6 +38,7 @@ $stmt->bind_param('ii', $postId, $post['user_id']);
 
 if ($stmt->execute()) {
     $stmt->close();
+    deletePostImage($post['image']);
     redirectWithSuccess('Post deleted successfully');
 } else {
     $stmt->close();
